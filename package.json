@@ -1,0 +1,52 @@
+{
+  "name": "hjm",
+  "version": "0.3.0",
+  "description": "HJM - 哈基米区块链，使用中文字符编码的以太坊风格区块链实现",
+  "main": "hjm/index.js",
+  "bin": {
+    "hjm": "./cli.js"
+  },
+  "files": [
+    "hjm/",
+    "cli.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "jest",
+    "demo": "node cli.js demo",
+    "start": "node cli.js node",
+    "quick-test": "node examples/quick_test.js",
+    "simple-test": "node examples/simple_test.js"
+  },
+  "keywords": [
+    "blockchain",
+    "hajimi",
+    "哈基米",
+    "chinese-encoding",
+    "troika",
+    "pow",
+    "smart-contract",
+    "vm",
+    "json-rpc"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0x3st/hjm.git"
+  },
+  "homepage": "https://github.com/0x3st/hjm#readme",
+  "bugs": {
+    "url": "https://github.com/0x3st/hjm/issues"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.0.0",
+    "elliptic": "^6.5.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
