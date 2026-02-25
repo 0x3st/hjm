@@ -6,45 +6,45 @@ export default defineConfig({
   base: '/hjm/',
 
   locales: {
-    zh: {
+    root: {
       label: '中文',
       lang: 'zh-CN',
-      link: '/zh/',
+      link: '/',
       themeConfig: {
         nav: [
-          { text: '指南', link: '/zh/guide/getting-started' },
-          { text: '进阶', link: '/zh/advanced/vm' },
-          { text: '参考', link: '/zh/reference/address' },
+          { text: '指南', link: '/guide/getting-started' },
+          { text: '进阶', link: '/advanced/vm' },
+          { text: '参考', link: '/reference/address' },
         ],
         sidebar: {
-          '/zh/guide/': [
+          '/guide/': [
             {
               text: '指南',
               items: [
-                { text: '快速开始', link: '/zh/guide/getting-started' },
-                { text: 'CLI 命令行', link: '/zh/guide/cli' },
-                { text: 'JSON-RPC API', link: '/zh/guide/rpc-api' },
-                { text: '核心概念', link: '/zh/guide/concepts' },
+                { text: '快速开始', link: '/guide/getting-started' },
+                { text: 'CLI 命令行', link: '/guide/cli' },
+                { text: 'JSON-RPC API', link: '/guide/rpc-api' },
+                { text: '核心概念', link: '/guide/concepts' },
               ],
             },
           ],
-          '/zh/advanced/': [
+          '/advanced/': [
             {
               text: '进阶',
               items: [
-                { text: 'HJM VM', link: '/zh/advanced/vm' },
-                { text: '合约', link: '/zh/advanced/contracts' },
-                { text: '签名方案', link: '/zh/advanced/signatures' },
-                { text: '哈气值系统', link: '/zh/advanced/haqi' },
+                { text: 'HJM VM', link: '/advanced/vm' },
+                { text: '合约', link: '/advanced/contracts' },
+                { text: '签名方案', link: '/advanced/signatures' },
+                { text: '哈气值系统', link: '/advanced/haqi' },
               ],
             },
           ],
-          '/zh/reference/': [
+          '/reference/': [
             {
               text: '参考',
               items: [
-                { text: '地址体系', link: '/zh/reference/address' },
-                { text: '项目架构', link: '/zh/reference/architecture' },
+                { text: '地址体系', link: '/reference/address' },
+                { text: '项目架构', link: '/reference/architecture' },
               ],
             },
           ],
