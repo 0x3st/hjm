@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license" />
   <img src="https://img.shields.io/badge/node-%3E%3D16-green" alt="node" />
   <img src="https://img.shields.io/badge/version-0.3.0-orange" alt="version" />
+  <img src="https://img.shields.io/npm/v/hajimi-chain" alt="npm" />
 </p>
 
 ---
@@ -58,6 +59,12 @@ Key features:
 | Rollback Semantics | `REVERT` rolls back state changes, keeps failed receipt, deducts fee |
 
 ## Install
+
+```bash
+npm install hajimi-chain
+```
+
+Or install from source:
 
 ```bash
 git clone https://github.com/0x3st/hjm.git

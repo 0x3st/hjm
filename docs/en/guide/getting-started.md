@@ -24,6 +24,12 @@ Key features:
 ## Install
 
 ```bash
+npm install hajimi-chain
+```
+
+Or install from source:
+
+```bash
 git clone https://github.com/0x3st/hjm.git
 cd hjm
 npm install

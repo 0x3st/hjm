@@ -9,7 +9,7 @@
 地址结构：`前缀 + 版本tryte + 主体 + 4字节校验码`
 
 ```javascript
-const { Wallet, isValidAddress } = require('./hjm');
+const { Wallet, isValidAddress } = require('hajimi-chain');
 
 const w = new Wallet();
 console.log(w.address);              // 哈原生...

@@ -3,7 +3,13 @@
 ## 安装
 
 ```bash
-git clone <repo-url>
+npm install hajimi-chain
+```
+
+或从源码安装：
+
+```bash
+git clone https://github.com/0x3st/hjm.git
 cd hjm
 npm install
 
@@ -43,7 +49,7 @@ hjm info                             # 查看链状态
 ## JS API 用法
 
 ```javascript
-const { Blockchain, Wallet, encodeHex, decodeToHex, encodeProgram } = require('hjm');
+const { Blockchain, Wallet, encodeHex, decodeToHex, encodeProgram } = require('hajimi-chain');
 
 // 编码转换
 encodeHex('0xdeadbeef');   // → 哈基米字符串

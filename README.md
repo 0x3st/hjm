@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license" />
   <img src="https://img.shields.io/badge/node-%3E%3D16-green" alt="node" />
   <img src="https://img.shields.io/badge/version-0.3.0-orange" alt="version" />
+  <img src="https://img.shields.io/npm/v/hajimi-chain" alt="npm" />
 </p>
 
 ---
@@ -60,7 +61,13 @@ HJM 把传统区块链里的十六进制地址和哈希值，替换成了 **"哈
 ## 安装
 
 ```bash
-git clone <repo-url>
+npm install hajimi-chain
+```
+
+或从源码安装：
+
+```bash
+git clone https://github.com/0x3st/hjm.git
 cd hjm
 npm install
 
@@ -98,7 +105,7 @@ hjm info                             # 查看链状态
 JS API 用法：
 
 ```javascript
-const { Blockchain, Wallet, encodeHex, decodeToHex, encodeProgram } = require('hjm');
+const { Blockchain, Wallet, encodeHex, decodeToHex, encodeProgram } = require('hajimi-chain');
 
 // 编码转换
 encodeHex('0xdeadbeef');   // → 哈基米字符串
@@ -315,7 +322,7 @@ const chain = new Blockchain({
 切换签名方案：
 
 ```javascript
-const { setSignatureScheme, Secp256k1SignatureScheme } = require('./hjm');
+const { setSignatureScheme, Secp256k1SignatureScheme } = require('hajimi-chain');
 setSignatureScheme(new Secp256k1SignatureScheme());
 ```
 
@@ -330,7 +337,7 @@ setSignatureScheme(new Secp256k1SignatureScheme());
 地址结构：`前缀 + 版本tryte + 主体 + 4字节校验码`
 
 ```javascript
-const { Wallet, isValidAddress } = require('./hjm');
+const { Wallet, isValidAddress } = require('hajimi-chain');
 
 const w = new Wallet();
 console.log(w.address);              // 哈原生...

@@ -17,6 +17,6 @@ const chain = new Blockchain({
 ## 切换签名方案
 
 ```javascript
-const { setSignatureScheme, Secp256k1SignatureScheme } = require('./hjm');
+const { setSignatureScheme, Secp256k1SignatureScheme } = require('hajimi-chain');
 setSignatureScheme(new Secp256k1SignatureScheme());
 ```
