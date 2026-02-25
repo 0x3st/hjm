@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'HJM',
   description: 'Hajimi Blockchain Documentation',
-  base: '/hjm/',
+  base: '/',
 
   locales: {
     root: {
