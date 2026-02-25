@@ -8,6 +8,10 @@
 </p>
 
 <p align="center">
+  中文 | <a href="./README.en.md">English</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license" />
   <img src="https://img.shields.io/badge/node-%3E%3D16-green" alt="node" />
   <img src="https://img.shields.io/badge/version-0.3.0-orange" alt="version" />

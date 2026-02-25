@@ -19,3 +19,7 @@ coverage/
 *.log
 blockchain_data/
 .ace-tool/
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

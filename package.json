@@ -1,10 +1,10 @@
 {
-  "name": "hjm",
+  "name": "hajimi-chain",
   "version": "0.3.0",
   "description": "HJM - 哈基米区块链，使用中文字符编码的以太坊风格区块链实现",
   "main": "hjm/index.js",
   "bin": {
-    "hjm": "./cli.js"
+    "hjm": "cli.js"
   },
   "files": [
     "hjm/",
@@ -16,6 +16,9 @@
     "test": "jest",
     "demo": "node cli.js demo",
     "start": "node cli.js node",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "quick-test": "node examples/quick_test.js",
     "simple-test": "node examples/simple_test.js"
   },
@@ -47,6 +50,7 @@
     "elliptic": "^6.5.4"
   },
   "devDependencies": {
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "vitepress": "^1.6.4"
   }
 }
