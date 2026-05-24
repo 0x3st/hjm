@@ -6,6 +6,9 @@ hero:
   tagline: 地址是哈基米，哈希是哈基米，连 PoW 都在数哈气
   actions:
     - theme: brand
+      text: 完整走一遍
+      link: /guide/walkthrough
+    - theme: alt
       text: 快速开始
       link: /guide/getting-started
     - theme: alt

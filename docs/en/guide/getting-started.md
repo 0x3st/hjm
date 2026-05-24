@@ -1,5 +1,7 @@
 # Getting Started
 
+If this is your first time touching a blockchain project, start with the [Full Walkthrough](/en/guide/walkthrough). It walks through installation, node startup, wallets, mining, transfers, contracts, receipts, and P2P synchronization step by step.
+
 ## What is HJM?
 
 HJM replaces the hexadecimal addresses and hashes in traditional blockchains with an encoding based on 27 Chinese characters such as **"哈基米莫南北绿豆阿西呀库"**.

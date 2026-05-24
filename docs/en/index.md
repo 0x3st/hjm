@@ -6,6 +6,9 @@ hero:
   tagline: Addresses are Hajimi, hashes are Hajimi, even PoW counts HaQi
   actions:
     - theme: brand
+      text: Full Walkthrough
+      link: /en/guide/walkthrough
+    - theme: alt
       text: Get Started
       link: /en/guide/getting-started
     - theme: alt
