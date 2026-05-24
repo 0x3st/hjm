@@ -11,6 +11,7 @@ const { Wallet } = require('./wallet');
 const { getHaQiMetrics } = require('./block');
 const { isValidAddress } = require('./crypto');
 const { encodeProgram } = require('./vm');
+const { P2PServer } = require('./p2p');
 
 const VERSION = '0.3.0';
 
@@ -28,6 +29,14 @@ function createNode(options = {}) {
   const chain = new Blockchain(chainOpts);
   // 节点内置钱包缓存：address → Wallet
   const wallets = new Map();
+
+  // ── P2P ──
+  const p2pEnabled = options.p2p !== false;
+  const p2p = p2pEnabled ? new P2PServer(chain, {
+    p2pPort: options.p2pPort || 6001,
+    seeds: options.seeds || [],
+    rejectPrivateIp: options.rejectPrivateIp || false,
+  }) : null;
 
   // ── RPC 方法 ──
 
@@ -115,6 +124,7 @@ function createNode(options = {}) {
         pendingTxCount: chain.pendingTransactions.length,
         miningReward: chain.miningReward,
         valid: chain.isChainValid(),
+        p2p: p2p ? p2p.getPeersInfo() : null,
       };
     },
 
@@ -178,6 +188,12 @@ function createNode(options = {}) {
         address: addr,
         balance: chain.getBalance(addr),
       }));
+    },
+
+    // 查看 P2P 节点信息
+    hjm_peers() {
+      if (!p2p) return { enabled: false, connectedCount: 0, knownPeers: [] };
+      return { enabled: true, ...p2p.getPeersInfo() };
     },
   };
 
@@ -252,7 +268,7 @@ function createNode(options = {}) {
     }
   }
 
-  return { server, chain, wallets, port, methods };
+  return { server, chain, wallets, port, methods, p2p };
 }
 
 module.exports = { createNode };

@@ -38,6 +38,9 @@ class Blockchain {
     this.pendingTransactions = [];
     this.receiptsByBlock = {};
 
+    // 事件监听器
+    this._listeners = {};
+
     this.state = createEmptyState();
     this.balances = this.state.balances;
     this.nonces = this.state.nonces;
@@ -92,6 +95,25 @@ class Blockchain {
 
   getLatestBlock() {
     return this.chain[this.chain.length - 1];
+  }
+
+  log(...args) {
+    console.log(...args);
+  }
+
+  on(event, fn) {
+    if (!this._listeners[event]) this._listeners[event] = [];
+    this._listeners[event].push(fn);
+  }
+
+  emit(event, ...args) {
+    for (const fn of this._listeners[event] || []) {
+      try {
+        fn(...args);
+      } catch (err) {
+        console.error(`[Event:${event}] 监听器异常:`, err.message);
+      }
+    }
   }
 
   getHaQiValue() {
@@ -255,7 +277,9 @@ class Blockchain {
     return true;
   }
 
-  addTransaction(transaction) {
+  addTransaction(transaction, options = {}) {
+    const silent = options.silent || false;
+
     try {
       const tx = Transaction.fromData(transaction);
 
@@ -350,6 +374,9 @@ class Blockchain {
       }
 
       this.pendingTransactions.push(tx);
+      if (!silent) {
+        this.emit('newTransaction', tx);
+      }
       return true;
     } catch (err) {
       console.log(`添加交易时发生异常: ${err.message}`);
@@ -416,7 +443,160 @@ class Blockchain {
     this.sigIndices = this.state.sigIndices;
     this.receiptsByBlock[block.index] = applied.receipts;
     this.pendingTransactions = [];
+    this.emit('newBlock', block);
 
+    return true;
+  }
+
+  addBlock(blockData) {
+    try {
+      const block = new Block(blockData);
+      const latest = this.getLatestBlock();
+
+      if (block.index !== this.chain.length) {
+        this.log(`区块索引不匹配: ${block.index} != ${this.chain.length}`);
+        return false;
+      }
+      if (block.previousHash !== latest.hash) {
+        this.log(`区块前置哈希不匹配`);
+        return false;
+      }
+      if (block.chainId !== this.chainId) {
+        this.log(`区块链标识不匹配: ${block.chainId} != ${this.chainId}`);
+        return false;
+      }
+      if (block.hash !== block.calculateHash()) {
+        this.log(`区块哈希无效`);
+        return false;
+      }
+      if (!block.hasValidProof()) {
+        this.log(`区块工作量证明无效`);
+        return false;
+      }
+      if (block.difficulty !== this.difficulty) {
+        this.log(`区块难度不符: ${block.difficulty} != ${this.difficulty}`);
+        return false;
+      }
+      if (block.txRoot !== block.calculateTxRoot()) {
+        this.log(`区块 txRoot 无效`);
+        return false;
+      }
+      if (!this._validateRewardTransactions(block.transactions, { minerAddress: block.minerAddress })) {
+        this.log(`区块奖励交易校验失败`);
+        return false;
+      }
+
+      const applied = applyTransactions(this.state, block.transactions, {
+        chainId: this.chainId,
+        minerAddress: block.minerAddress,
+        allowZeroSystem: false,
+        acceptedSignatureSchemes: this.acceptedSignatureSchemes,
+      });
+      if (!applied.ok) {
+        this.log(`区块状态转移失败: ${applied.error}`);
+        return false;
+      }
+      if (block.stateRoot !== computeStateRoot(applied.state)) {
+        this.log(`区块 stateRoot 无效`);
+        return false;
+      }
+      if (block.receiptsRoot !== computeReceiptsRoot(applied.receipts)) {
+        this.log(`区块 receiptsRoot 无效`);
+        return false;
+      }
+
+      this.chain.push(block);
+      this.state = applied.state;
+      this.balances = this.state.balances;
+      this.nonces = this.state.nonces;
+      this.sigIndices = this.state.sigIndices;
+      this.receiptsByBlock[block.index] = applied.receipts;
+
+      // 移除已被打包的交易
+      const packedHashes = new Set(block.transactions.map(tx => tx.txHash));
+      this.pendingTransactions = this.pendingTransactions.filter(tx => !packedHashes.has(tx.txHash));
+
+      return true;
+    } catch (err) {
+      this.log(`接收区块异常: ${err.message}`);
+      return false;
+    }
+  }
+
+  replaceChain(newChainData) {
+    if (!Array.isArray(newChainData) || newChainData.length <= this.chain.length) {
+      this.log(`新链不够长: ${newChainData ? newChainData.length : 0} <= ${this.chain.length}`);
+      return false;
+    }
+
+    // 创世块锚定验证
+    const myGenesisHash = this.chain[0].hash;
+    const newGenesisHash = newChainData[0]?.hash;
+    if (newGenesisHash !== myGenesisHash) {
+      this.log('创世块不匹配，拒绝链替换');
+      return false;
+    }
+
+    // 保存旧的 pending 交易用于恢复
+    const oldPending = [...this.pendingTransactions];
+
+    // 从创世块开始完整验证新链
+    let replayState = createEmptyState();
+    const newChain = [];
+    const newReceipts = {};
+
+    for (let i = 0; i < newChainData.length; i++) {
+      const block = new Block(newChainData[i]);
+      const isGenesis = i === 0;
+
+      if (block.index !== i) return false;
+      if (block.chainId !== this.chainId) return false;
+      if (block.hash !== block.calculateHash()) return false;
+      if (!block.hasValidProof()) return false;
+      if (!isGenesis && block.difficulty !== this.difficulty) return false;
+      if (!isGenesis && block.previousHash !== newChain[i - 1].hash) return false;
+      if (block.txRoot !== block.calculateTxRoot()) return false;
+      if (!this._validateRewardTransactions(block.transactions, { isGenesis, minerAddress: block.minerAddress })) return false;
+
+      const applied = applyTransactions(replayState, block.transactions, {
+        chainId: this.chainId,
+        minerAddress: block.minerAddress,
+        allowZeroSystem: isGenesis,
+        acceptedSignatureSchemes: this.acceptedSignatureSchemes,
+      });
+      if (!applied.ok) return false;
+      if (block.stateRoot !== computeStateRoot(applied.state)) return false;
+      if (block.receiptsRoot !== computeReceiptsRoot(applied.receipts)) return false;
+
+      replayState = applied.state;
+      newChain.push(block);
+      newReceipts[i] = applied.receipts;
+    }
+
+    // 收集新链所有交易哈希
+    const onChainTxHashes = new Set();
+    for (const block of newChain) {
+      for (const tx of block.transactions) {
+        onChainTxHashes.add(tx.txHash);
+      }
+    }
+
+    this.chain = newChain;
+    this.state = replayState;
+    this.balances = this.state.balances;
+    this.nonces = this.state.nonces;
+    this.sigIndices = this.state.sigIndices;
+    this.receiptsByBlock = newReceipts;
+    this.pendingTransactions = [];
+
+    // 恢复未上链的有效交易（静默模式，不触发事件）
+    for (const tx of oldPending) {
+      if (!onChainTxHashes.has(tx.txHash)) {
+        this.addTransaction(tx, { silent: true });
+      }
+    }
+
+    this.log(`链已切换，新高度: ${this.chain.length}`);
     return true;
   }
 

@@ -65,6 +65,7 @@ const {
 } = require('./vm');
 
 const { createNode } = require('./rpc');
+const { P2PServer } = require('./p2p');
 
 const VERSION = '0.3.0';
 
@@ -126,5 +127,6 @@ module.exports = {
   encodeProgram,
   disassembleProgram,
   createNode,
+  P2PServer,
   VERSION,
 };

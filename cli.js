@@ -109,22 +109,45 @@ program
 
 program
   .command('node')
-  .description('启动 HJM 节点（HTTP JSON-RPC）')
-  .option('-p, --port <port>', '端口', '8546')
+  .description('启动 HJM 节点（HTTP JSON-RPC + P2P）')
+  .option('-p, --port <port>', 'RPC 端口', '8546')
+  .option('--rpc-host <host>', 'RPC 绑定地址', '127.0.0.1')
   .option('--haqi <value>', '哈气值', '1')
   .option('--reward <amount>', '挖矿奖励', '1000')
   .option('--chain-id <id>', '链 ID', '1')
+  .option('--p2p-port <port>', 'P2P 端口', '6001')
+  .option('--seeds <urls>', '种子节点（逗号分隔）', '')
+  .option('--no-p2p', '禁用 P2P')
+  .option('--reject-private-ip', '拒绝私有 IP 地址的节点连接')
   .action((opts) => {
-    const { server, port } = createNode({
+    const seeds = opts.seeds ? opts.seeds.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const rpcHost = opts.rpcHost || '127.0.0.1';
+    const { server, port, p2p } = createNode({
       port: Number(opts.port),
       haQiValue: Number(opts.haqi),
       miningReward: Number(opts.reward),
       chainId: Number(opts.chainId),
+      p2p: opts.p2p,
+      p2pPort: Number(opts.p2pPort),
+      seeds,
+      rejectPrivateIp: opts.rejectPrivateIp || false,
     });
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, rpcHost, () => {
       console.log(`⛓  HJM 节点已启动`);
-      console.log(`   RPC: http://127.0.0.1:${port}`);
+      if (rpcHost === '0.0.0.0') {
+        console.log(`   ⚠️  警告: RPC 绑定到 0.0.0.0，所有网络接口可访问，存在安全风险！`);
+      }
+      console.log(`   RPC: http://${rpcHost}:${port}`);
       console.log(`   链ID: ${opts.chainId}  哈气值: ${opts.haqi}  奖励: ${opts.reward}`);
+      if (p2p) {
+        p2p.myAddress = `ws://0.0.0.0:${opts.p2pPort}`;
+        p2p.start(() => {
+          console.log(`   P2P: ws://0.0.0.0:${opts.p2pPort}`);
+          if (seeds.length) console.log(`   种子节点: ${seeds.join(', ')}`);
+        });
+      } else {
+        console.log(`   P2P: 已禁用`);
+      }
       console.log(`   Ctrl+C 停止\n`);
     });
   });
@@ -155,6 +178,9 @@ program
     console.log(`哈气值: H=${r.haQiValue} (${r.haQiLevel}阶${r.haQiPoint}点)  压强: ${r.haQiPressure}`);
     console.log(`挖矿奖励: ${r.miningReward}  链有效: ${r.valid}`);
     console.log(`最新哈希: ${r.latestHash.slice(0, 30)}...`);
+    if (r.p2p) {
+      console.log(`P2P 节点: ${r.p2p.connectedCount} 个连接`);
+    }
   }));
 
 program
@@ -269,6 +295,21 @@ program
     const r = await rpcCall('hjm_listWallets', [], rpcUrl);
     if (!r.length) { console.log('节点内无钱包'); return; }
     r.forEach((w) => console.log(`${w.address.slice(0, 24)}...  余额: ${w.balance}`));
+  }));
+
+program
+  .command('peers')
+  .description('查看 P2P 节点连接')
+  .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
+  .action(withRpc(async (_opts, rpcUrl) => {
+    const r = await rpcCall('hjm_peers', [], rpcUrl);
+    if (!r.enabled) { console.log('P2P 未启用'); return; }
+    console.log(`已连接节点: ${r.connectedCount}`);
+    if (r.knownPeers.length) {
+      r.knownPeers.forEach((p) => console.log(`  ${p}`));
+    } else {
+      console.log('  暂无已知节点');
+    }
   }));
 
 program

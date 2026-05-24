@@ -49,30 +49,39 @@ class Block {
     timestamp,
     transactions,
     previousHash,
+    previous_hash,  // snake_case alias for toDict() compatibility
     nonce = 0,
     difficulty = 1,
-    haQiValue = undefined,
-    chainId = 1,
-    minerAddress = '系统',
-    txRoot = null,
-    stateRoot = null,
-    receiptsRoot = null,
+    haQiValue,
+    ha_qi_value,    // snake_case alias
+    chainId,
+    chain_id,       // snake_case alias
+    minerAddress,
+    miner_address,  // snake_case alias
+    txRoot,
+    tx_root,        // snake_case alias
+    stateRoot,
+    state_root,     // snake_case alias
+    receiptsRoot,
+    receipts_root,  // snake_case alias
     hash = null,
   }) {
     this.version = version;
     this.index = index;
     this.timestamp = timestamp;
     this.transactions = (transactions || []).map((tx) => Transaction.fromData(tx));
-    this.previousHash = previousHash;
+    // Support both camelCase and snake_case (toDict output)
+    this.previousHash = previousHash ?? previous_hash;
     this.nonce = nonce;
-    const normalizedDifficulty = haQiValue === undefined ? difficulty : haQiValue;
+    const effectiveHaQi = haQiValue ?? ha_qi_value;
+    const normalizedDifficulty = effectiveHaQi === undefined ? difficulty : effectiveHaQi;
     this.difficulty = normalizeHaQiValue(normalizedDifficulty, 'difficulty');
     this.haQiValue = this.difficulty;
-    this.chainId = chainId;
-    this.minerAddress = minerAddress;
-    this.txRoot = txRoot || this.calculateTxRoot();
-    this.stateRoot = stateRoot || '';
-    this.receiptsRoot = receiptsRoot || '';
+    this.chainId = chainId ?? chain_id ?? 1;
+    this.minerAddress = minerAddress ?? miner_address ?? '系统';
+    this.txRoot = txRoot ?? tx_root ?? this.calculateTxRoot();
+    this.stateRoot = stateRoot ?? state_root ?? '';
+    this.receiptsRoot = receiptsRoot ?? receipts_root ?? '';
     this.hash = hash;
   }
 

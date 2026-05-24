@@ -549,6 +549,143 @@ describe('TestBlockchain', () => {
     expect(blockchain.isChainValid()).toBe(false);
   });
 
+  test('replaceChain accepts chain with matching genesis hash', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 100 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+    blockchain.minePendingTransactions(wallet.address);
+
+    const longerChain = blockchain.chain.map(b => b.toDict());
+    const shorterBlockchain = new Blockchain(1, { chainId: 1, miningReward: 100 });
+
+    expect(shorterBlockchain.chain.length).toBe(1);
+    expect(shorterBlockchain.replaceChain(longerChain)).toBe(true);
+    expect(shorterBlockchain.chain.length).toBe(3);
+  });
+
+  test('replaceChain rejects chain with mismatched genesis hash', () => {
+    const blockchain1 = new Blockchain(1, { chainId: 1, miningReward: 100 });
+    const blockchain2 = new Blockchain(1, { chainId: 1, miningReward: 100, genesisRecipient: '不同矿工' });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain2.minePendingTransactions(wallet.address);
+    blockchain2.minePendingTransactions(wallet.address);
+
+    const foreignChain = blockchain2.chain.map(b => b.toDict());
+
+    expect(blockchain1.chain[0].hash).not.toBe(blockchain2.chain[0].hash);
+    expect(blockchain1.replaceChain(foreignChain)).toBe(false);
+    expect(blockchain1.chain.length).toBe(1);
+  });
+
+  test('replaceChain preserves valid pending transactions not on new chain', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+    blockchain.minePendingTransactions(wallet.address);
+
+    const tx = wallet.createTransaction('recipient', 10, {
+      nonce: blockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+    expect(blockchain.addTransaction(tx)).toBe(true);
+    expect(blockchain.pendingTransactions.length).toBe(1);
+
+    const longerChain = blockchain.chain.map(b => b.toDict());
+    const shorterBlockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    shorterBlockchain.minePendingTransactions(wallet.address);
+
+    const pendingTx = shorterBlockchain.pendingTransactions[0];
+    shorterBlockchain.pendingTransactions = [];
+
+    const tx2 = wallet.createTransaction('recipient2', 5, {
+      nonce: shorterBlockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+    expect(shorterBlockchain.addTransaction(tx2)).toBe(true);
+
+    expect(shorterBlockchain.replaceChain(longerChain)).toBe(true);
+    expect(shorterBlockchain.pendingTransactions.length).toBe(1);
+    expect(shorterBlockchain.pendingTransactions[0].txHash).toBe(tx2.txHash);
+  });
+
+  test('replaceChain excludes transactions already on new chain', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+
+    const tx = wallet.createTransaction('recipient', 10, {
+      nonce: blockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+    expect(blockchain.addTransaction(tx)).toBe(true);
+    blockchain.minePendingTransactions(wallet.address);
+
+    const longerChain = blockchain.chain.map(b => b.toDict());
+    const shorterBlockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+
+    shorterBlockchain.pendingTransactions = [tx];
+
+    expect(shorterBlockchain.replaceChain(longerChain)).toBe(true);
+    expect(shorterBlockchain.pendingTransactions.length).toBe(0);
+  });
+
+  test('replaceChain discards invalid transactions under new state', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+    blockchain.minePendingTransactions(wallet.address);
+
+    const longerChain = blockchain.chain.map(b => b.toDict());
+    const shorterBlockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    shorterBlockchain.minePendingTransactions(wallet.address);
+
+    const invalidTx = wallet.createTransaction('recipient', 99999, {
+      nonce: shorterBlockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+    shorterBlockchain.pendingTransactions = [invalidTx];
+
+    expect(shorterBlockchain.replaceChain(longerChain)).toBe(true);
+    expect(shorterBlockchain.pendingTransactions.length).toBe(0);
+  });
+
+  test('replaceChain restored transactions do not trigger newTransaction event', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+    blockchain.minePendingTransactions(wallet.address);
+
+    const longerChain = blockchain.chain.map(b => b.toDict());
+    const shorterBlockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    shorterBlockchain.minePendingTransactions(wallet.address);
+
+    const tx = wallet.createTransaction('recipient', 10, {
+      nonce: shorterBlockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+    shorterBlockchain.pendingTransactions = [tx];
+
+    let eventFired = false;
+    shorterBlockchain.on('newTransaction', () => {
+      eventFired = true;
+    });
+
+    expect(shorterBlockchain.replaceChain(longerChain)).toBe(true);
+    expect(shorterBlockchain.pendingTransactions.length).toBe(1);
+    expect(eventFired).toBe(false);
+  });
+
   test('create and call contract tx type', () => {
     const blockchain = new Blockchain(1, { chainId: 5, miningReward: 2000 });
     const deployer = new Wallet({ chainId: 5, startNonce: 0 });
@@ -852,6 +989,48 @@ describe('TestBlockchain', () => {
     expect(callReceipt.success).toBe(true);
     expect(callReceipt.returnData).toBe('stored');
     expect(blockchain.getContractStorage(contractAddress, 'name')).toBe('alice');
+  });
+});
+
+describe('TestEventEmitter', () => {
+  test('listener exception does not affect other listeners', () => {
+    const blockchain = new Blockchain(1, { chainId: 1 });
+    const results = [];
+
+    blockchain.on('testEvent', () => {
+      results.push('first');
+    });
+    blockchain.on('testEvent', () => {
+      throw new Error('SB listener crashed');
+    });
+    blockchain.on('testEvent', () => {
+      results.push('third');
+    });
+
+    blockchain.emit('testEvent');
+
+    expect(results).toEqual(['first', 'third']);
+  });
+
+  test('listener exception does not affect addTransaction return value', () => {
+    const blockchain = new Blockchain(1, { chainId: 1, miningReward: 1000 });
+    const wallet = new Wallet({ chainId: 1, startNonce: 0 });
+
+    blockchain.minePendingTransactions(wallet.address);
+
+    blockchain.on('newTransaction', () => {
+      throw new Error('SB listener crashed');
+    });
+
+    const tx = wallet.createTransaction('recipient', 10, {
+      nonce: blockchain.getNonce(wallet.address),
+      fee: 2,
+      gasLimit: 30,
+    });
+
+    const result = blockchain.addTransaction(tx);
+    expect(result).toBe(true);
+    expect(blockchain.pendingTransactions.length).toBe(1);
   });
 });
 
