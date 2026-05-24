@@ -53,7 +53,149 @@ create wallets -> mine -> transfer -> mine again -> deploy contract -> call cont
 
 If you see the demo finish, the project is working.
 
-## Step 2: Start a Node
+## Step 2: Understand the Demo Output
+
+The demo prints a sequence of actions. Your addresses, hashes, and contract address will be different from the examples below. Focus on what each section means.
+
+### 1. Create Wallets
+
+```text
+1. Create wallets
+   Alice: 哈原生哈...
+   Bob:   哈原生哈...
+```
+
+The demo creates two accounts: Alice and Bob.
+
+An address is like an account number. It can be shared. A private key is like the password proving ownership. The demo only prints shortened addresses to keep the output readable.
+
+### 2. Mine for Alice
+
+```text
+2. Mine for Alice
+Mining block #1... HaQi value(H): 1
+Block mined! Hash: 蛤嗨赫几... HaQi pressure: 3
+   Block #1  Alice balance: 1000
+```
+
+Alice starts with no funds, so the system mines a block and sends the mining reward to Alice.
+
+- `Block #1` is the first normal block after the genesis block `#0`.
+- `HaQi value H = 1` is the PoW difficulty. HJM requires the block hash, when converted to trits, to start with `H` zero trits.
+- `HaQi pressure = 3` is `3^H`, a rough expected work factor. With `H = 1`, the average search space is about `3`.
+- `Alice balance: 1000` means Alice received the default mining reward.
+
+### 3. Alice Transfers to Bob
+
+```text
+3. Alice -> Bob transfer 100
+   Tx hash: 哈觅合咪...
+```
+
+Alice creates a transaction sending `100` to Bob.
+
+The transaction hash is the transaction's identifier, like a tracking number. In HJM it is displayed as Hajimi characters instead of `0x...`.
+
+At this moment, the transaction is only pending. It is confirmed only after mining puts it into a block.
+
+### 4. Mine to Confirm
+
+```text
+4. Mine to confirm
+   Block #2
+   Alice balance: 700
+   Bob balance:   1300
+```
+
+The demo mines block `#2`, which confirms the transfer.
+
+The balance change is:
+
+```text
+Alice: 1000 - 100 - 200 = 700
+Bob:      0 + 100 + 1000 + 200 = 1300
+```
+
+Alice sent `100` and paid a `200` fee. Bob received the transfer, the mining reward, and the fee because Bob was the miner reward recipient for that block.
+
+This is the core blockchain flow:
+
+```text
+transaction enters pending pool -> mining -> transaction enters block -> state changes
+```
+
+### 5. Deploy Contract
+
+```text
+5. Deploy contract
+   Deploy tx hash: 赫蜜呵蜜...
+   Contract address: 哈合约哈...
+```
+
+A smart contract is a small program stored on-chain.
+
+The demo deploys a tiny contract that stores:
+
+```text
+greeting = hakimi
+```
+
+The deploy hash identifies the deployment transaction. The contract address identifies the deployed contract, similar to an Ethereum contract address.
+
+### 6. Call Contract
+
+```text
+6. Call contract
+Mining block #5...
+```
+
+Deploying a contract is like installing the program on-chain. Calling it is like running that program. HJM VM executes the contract instructions, charges gas, handles storage, and records receipts.
+
+### 7. Query Contract Storage
+
+```text
+7. Query contract storage
+   greeting = "hakimi"
+```
+
+This proves that the contract wrote data into chain storage.
+
+Think of the contract as a little cabinet: `greeting` is the drawer name, and `hakimi` is the content inside.
+
+### 8. Validate the Chain
+
+```text
+8. Validate chain
+   Block height: 6  Valid: true
+```
+
+The chain has 6 blocks including genesis:
+
+```text
+#0 genesis
+#1 mine reward for Alice
+#2 confirm Alice -> Bob transfer
+#3 add more funds for Alice
+#4 deploy contract
+#5 call contract
+```
+
+`Valid: true` means the system checked the chain and found it consistent:
+
+- Each block links to the previous block.
+- Block hashes can be recalculated.
+- PoW hashes satisfy the HaQi difficulty.
+- Transactions and state transitions are valid.
+
+In one sentence:
+
+```text
+The demo runs a tiny chain and shows wallets, mining, transfers, confirmation, contract deployment, contract calls, storage, and chain validation.
+```
+
+Now we will reproduce those steps manually.
+
+## Step 3: Start a Node
 
 Open one terminal:
 
@@ -65,7 +207,7 @@ Keep this terminal open. It is your local blockchain node.
 
 Run the rest of the commands in a second terminal.
 
-## Step 3: Inspect the Chain
+## Step 4: Inspect the Chain
 
 ```bash
 node cli.js info
@@ -73,7 +215,7 @@ node cli.js info
 
 You should see block height, pending transaction count, HaQi value, and the latest hash.
 
-## Step 4: Create Two Wallets
+## Step 5: Create Two Wallets
 
 Create Alice:
 
@@ -91,7 +233,7 @@ node cli.js new --show-private-key
 
 Save Bob's address.
 
-## Step 5: Mine Funds for Alice
+## Step 6: Mine Funds for Alice
 
 ```bash
 node cli.js mine <AliceAddress>
@@ -105,7 +247,7 @@ node cli.js balance <AliceAddress>
 
 The default mining reward is `1000`.
 
-## Step 6: Transfer from Alice to Bob
+## Step 7: Transfer from Alice to Bob
 
 ```bash
 node cli.js transfer <AlicePrivateKey> <BobAddress> 100
@@ -119,7 +261,7 @@ Check the pending transaction count:
 node cli.js info
 ```
 
-## Step 7: Mine the Transfer
+## Step 8: Mine the Transfer
 
 ```bash
 node cli.js mine <AliceAddress>
@@ -138,7 +280,7 @@ The core flow is:
 create transaction -> pending pool -> mine block -> transaction enters chain -> state changes
 ```
 
-## Step 8: Encode and Decode
+## Step 9: Encode and Decode
 
 Encode hex into Hajimi characters:
 
@@ -158,7 +300,7 @@ You should get:
 0xdeadbeef
 ```
 
-## Step 9: Deploy a Simple Contract
+## Step 10: Deploy a Simple Contract
 
 This contract stores `greeting = hakimi` and returns `deployed`.
 
@@ -174,7 +316,7 @@ node cli.js mine <AliceAddress>
 
 Remember the printed block index.
 
-## Step 10: Find the Contract Address
+## Step 11: Find the Contract Address
 
 ```bash
 node cli.js receipts <blockIndex>
@@ -182,7 +324,7 @@ node cli.js receipts <blockIndex>
 
 The receipt should include a contract address and `deployed` as return data. Save the contract address.
 
-## Step 11: Query Contract Storage
+## Step 12: Query Contract Storage
 
 ```bash
 node cli.js storage <contractAddress> greeting
@@ -194,7 +336,7 @@ You should see:
 greeting: "hakimi"
 ```
 
-## Step 12: Call the Contract
+## Step 13: Call the Contract
 
 ```bash
 node cli.js call <AlicePrivateKey> <contractAddress>
@@ -214,7 +356,7 @@ node cli.js receipts <newBlockIndex>
 
 `success=true` means the call executed successfully.
 
-## Step 13: List Node Wallets
+## Step 14: List Node Wallets
 
 ```bash
 node cli.js wallets
@@ -224,7 +366,7 @@ This lists wallets known to the current node process.
 
 This teaching implementation does not use a persistent database. Restarting the node starts a fresh local chain.
 
-## Step 14: Try Two P2P Nodes
+## Step 15: Try Two P2P Nodes
 
 Stop the previous node with `Ctrl+C`.
 
