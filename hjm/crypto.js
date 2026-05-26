@@ -154,6 +154,25 @@ function computeNativeLeaf(seed, sigIndex) {
   return domainHash('哈叶节点', chainPubs);
 }
 
+function computeNativeLeafWithSigningChains(seed, sigIndex) {
+  const chainPubs = [];
+  const signingChains = [];
+  for (let chainIndex = 0; chainIndex < NATIVE_CHAIN_COUNT; chainIndex++) {
+    let current = deriveNativeSk(seed, sigIndex, chainIndex);
+    const steps = [current];
+    for (let step = 0; step < NATIVE_MAX_CHAIN_STEP; step++) {
+      current = domainHash('哈链步', [current]);
+      steps.push(current);
+    }
+    signingChains.push(steps);
+    chainPubs.push(current);
+  }
+  return {
+    leaf: domainHash('哈叶节点', chainPubs),
+    signingChains,
+  };
+}
+
 function computeParentNode(left, right) {
   return domainHash('哈默克尔节点', [left, right]);
 }
@@ -170,8 +189,11 @@ function buildNativeTree(seed) {
 
   const levels = [];
   const leaves = new Array(NATIVE_LEAF_COUNT);
+  const signingChainsByLeaf = new Array(NATIVE_LEAF_COUNT);
   for (let i = 0; i < NATIVE_LEAF_COUNT; i++) {
-    leaves[i] = computeNativeLeaf(seed, i);
+    const leafData = computeNativeLeafWithSigningChains(seed, i);
+    leaves[i] = leafData.leaf;
+    signingChainsByLeaf[i] = leafData.signingChains;
   }
   levels.push(leaves);
 
@@ -187,6 +209,7 @@ function buildNativeTree(seed) {
   const tree = {
     levels,
     root: levels[NATIVE_TREE_HEIGHT][0],
+    signingChainsByLeaf,
   };
   nativeTreeCache.set(cacheKey, tree);
   if (nativeTreeCache.size > NATIVE_TREE_CACHE_MAX) {
@@ -460,8 +483,13 @@ class HajimiWOTSSignatureScheme extends SignatureScheme {
     const digits = messageDigits(ensureBuffer(message, 'message'));
     const chainParts = [];
     for (let i = 0; i < NATIVE_CHAIN_COUNT; i++) {
-      const sk = deriveNativeSk(parsed.seed, sigIndex, i);
-      chainParts.push(repeatHash(sk, digits[i]));
+      const cachedStep = tree.signingChainsByLeaf?.[sigIndex]?.[i]?.[digits[i]];
+      if (cachedStep) {
+        chainParts.push(cachedStep);
+      } else {
+        const sk = deriveNativeSk(parsed.seed, sigIndex, i);
+        chainParts.push(repeatHash(sk, digits[i]));
+      }
     }
     const authPath = nativeAuthPath(tree.levels, sigIndex);
     return encodeNativeSignature(sigIndex, chainParts, authPath);

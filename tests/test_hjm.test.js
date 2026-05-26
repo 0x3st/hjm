@@ -3,7 +3,7 @@
  */
 
 const {
-  Wallet,
+  Wallet: HJMWallet,
   Transaction,
   Block,
   Blockchain,
@@ -24,6 +24,31 @@ const {
   isValidAddress,
   TX_TYPES,
 } = require('../hjm');
+
+const WOTS_FIXTURE_PRIVATE_KEYS = [
+  '嗨米嗨迷嘿嗨嗨眯哈蛤哈哈嗨鸡哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤哈蛤',
+  '嗨米嗨迷嘿嗨嗨眯哈蛤哈哈嗨鸡哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨哈嗨',
+  '嗨米嗨迷嘿嗨嗨眯哈蛤哈哈嗨鸡哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿哈嘿',
+  '嗨米嗨迷嘿嗨嗨眯哈蛤哈哈嗨鸡哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵哈呵',
+];
+let wotsFixtureIndex = 0;
+
+function Wallet(privateKey = null, options = {}) {
+  const activeScheme = getSignatureScheme().name;
+  const isOptionsOnly = privateKey && typeof privateKey === 'object' && !Buffer.isBuffer(privateKey);
+  if (activeScheme !== 'hajimi-wots' || (privateKey !== null && !isOptionsOnly)) {
+    return new HJMWallet(privateKey, options);
+  }
+
+  const walletOptions = isOptionsOnly ? privateKey : options;
+  const privateKeyFixture = WOTS_FIXTURE_PRIVATE_KEYS[wotsFixtureIndex % WOTS_FIXTURE_PRIVATE_KEYS.length];
+  wotsFixtureIndex += 1;
+  return HJMWallet.fromPrivateKey(privateKeyFixture, walletOptions);
+}
+
+beforeEach(() => {
+  wotsFixtureIndex = 0;
+});
 
 describe('TestEncoding', () => {
   test('hex encoding roundtrip', () => {
@@ -1035,6 +1060,23 @@ describe('TestEventEmitter', () => {
 });
 
 describe('TestSignatureScheme', () => {
+  test('native hajimi key generation works', () => {
+    const original = getSignatureScheme();
+    try {
+      setSignatureScheme(new HajimiWOTSSignatureScheme());
+      const wallet = new HJMWallet({ chainId: 1, startNonce: 0 });
+      const tx = wallet.createTransaction('recipient', 3, {
+        nonce: 0,
+        fee: 2,
+        gasLimit: 100,
+      });
+      expect(wallet.address.startsWith('哈原生')).toBe(true);
+      expect(tx.verify({ chainId: 1 })).toBe(true);
+    } finally {
+      setSignatureScheme(original);
+    }
+  });
+
   test('native hajimi signature scheme works', () => {
     const original = getSignatureScheme();
     try {
