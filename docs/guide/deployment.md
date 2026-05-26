@@ -52,7 +52,13 @@ node cli.js node \
 --rpc-host 0.0.0.0
 ```
 
-但这适合临时测试，不建议长期裸露。
+同时加上公网 RPC 模式：
+
+```bash
+--public-rpc
+```
+
+`--public-rpc` 会在 HTTP JSON-RPC 层只允许查询类方法和 `hjm_sendRawTransaction`，挡住 `hjm_transfer`、`hjm_importWallet`、`hjm_newWallet`、`hjm_mine` 这类更适合本机教学或私有管理的命令。
 
 ## 多台 VPS
 
@@ -169,6 +175,19 @@ hjm_peers
 ```
 
 关键是 `hjm_sendRawTransaction`：用户在本地签名，RPC 节点只接收已经签好的交易。
+
+启动公开 RPC 时，建议这样写：
+
+```bash
+node cli.js node \
+  --rpc-host 0.0.0.0 \
+  --port 8546 \
+  --public-rpc \
+  --p2p-host 0.0.0.0 \
+  --p2p-port 6001 \
+  --p2p-advertise ws://<你的公网IP>:6001 \
+  --data-dir .hjm-node
+```
 
 CLI 里对应的安全命令是：
 

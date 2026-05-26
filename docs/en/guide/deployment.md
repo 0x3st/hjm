@@ -40,6 +40,15 @@ Open only:
 6001/tcp
 ```
 
+If you really need public RPC, bind RPC to `0.0.0.0` and enable public RPC mode:
+
+```bash
+--rpc-host 0.0.0.0
+--public-rpc
+```
+
+`--public-rpc` enforces the public method allowlist at the HTTP JSON-RPC layer. It blocks teaching/local methods such as `hjm_transfer`, `hjm_importWallet`, `hjm_newWallet`, and `hjm_mine`.
+
 ## Multiple VPS Nodes
 
 Node A:
@@ -111,6 +120,19 @@ hjm_peers
 ```
 
 `hjm_sendRawTransaction` is the important method: users sign transactions locally, and the RPC node only receives already-signed transactions.
+
+Recommended public RPC startup:
+
+```bash
+node cli.js node \
+  --rpc-host 0.0.0.0 \
+  --port 8546 \
+  --public-rpc \
+  --p2p-host 0.0.0.0 \
+  --p2p-port 6001 \
+  --p2p-advertise ws://<your-public-ip>:6001 \
+  --data-dir .hjm-node
+```
 
 The safer CLI commands are:
 

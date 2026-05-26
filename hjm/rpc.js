@@ -16,9 +16,22 @@ const { encodeProgram } = require('./vm');
 const { P2PServer } = require('./p2p');
 
 const VERSION = '0.3.0';
+const PUBLIC_RPC_METHODS = [
+  'hjm_info',
+  'hjm_getBalance',
+  'hjm_getNonce',
+  'hjm_getStorage',
+  'hjm_getReceipts',
+  'hjm_sendRawTransaction',
+  'hjm_peers',
+];
 
 function createNode(options = {}) {
   const port = options.port || 8546;
+  const rpcMode = options.publicRpc ? 'public' : 'local';
+  const allowedRpcMethods = options.allowedRpcMethods
+    ? new Set(options.allowedRpcMethods)
+    : (options.publicRpc ? new Set(PUBLIC_RPC_METHODS) : null);
   const chainOpts = {
     chainId: options.chainId ?? 1,
     miningReward: options.miningReward ?? 1000,
@@ -153,16 +166,9 @@ function createNode(options = {}) {
         haQiPressure: metrics.haQiPressure,
         pendingTxCount: chain.pendingTransactions.length,
         miningReward: chain.miningReward,
+        rpcMode,
         valid: chain.isChainValid(),
-        publicMethods: [
-          'hjm_info',
-          'hjm_getBalance',
-          'hjm_getNonce',
-          'hjm_getStorage',
-          'hjm_getReceipts',
-          'hjm_sendRawTransaction',
-          'hjm_peers',
-        ],
+        publicMethods: PUBLIC_RPC_METHODS,
         p2p: p2p ? p2p.getPeersInfo() : null,
       };
     },
@@ -278,6 +284,11 @@ function createNode(options = {}) {
       }
 
       const { method, params, id } = parsed;
+      if (allowedRpcMethods && !allowedRpcMethods.has(method)) {
+        respond(res, id, null, { code: -32601, message: `Method not available in ${rpcMode} RPC mode: ${method}` });
+        return;
+      }
+
       const fn = methods[method];
       if (!fn) {
         respond(res, id, null, { code: -32601, message: `Method not found: ${method}` });
@@ -307,7 +318,7 @@ function createNode(options = {}) {
     }
   }
 
-  return { server, chain, wallets, port, methods, p2p };
+  return { server, chain, wallets, port, methods, p2p, rpcMode, publicRpcMethods: PUBLIC_RPC_METHODS };
 }
 
 function createPersistence(dataDir, chain) {

@@ -17,6 +17,7 @@ hjm demo                        # 一键演示完整流程
 ```bash
 # 启动节点（默认 127.0.0.1:8546）
 hjm node [--port 8546] [--haqi 1] [--reward 1000] [--chain-id 1]
+hjm node --rpc-host 0.0.0.0 --public-rpc  # 公网 RPC 模式
 
 # 以下命令连接运行中的节点（可加 --rpc <url> 指定地址）
 hjm info                                    # 链信息
@@ -29,6 +30,19 @@ hjm storage <合约地址> [key]                  # 查合约存储
 hjm receipts <区块号>                         # 查区块收据
 hjm wallets                                  # 列出节点内钱包
 ```
+
+## 本地签名命令
+
+公网 RPC 不应该接收用户私钥，所以优先用这组命令：
+
+```bash
+hjm transfer-local <私钥> <目标地址> <金额>     # 本地签名转账
+hjm deploy-local <私钥> '<指令JSON>'           # 本地签名部署
+hjm call-local <私钥> <合约地址> [金额]         # 本地签名调用
+hjm send-raw '<交易JSON>'                      # 提交已签名交易
+```
+
+`transfer`、`deploy`、`call` 会让节点代签，更适合本机教学；`transfer-local`、`deploy-local`、`call-local` 会在本地签名，然后调用 `hjm_sendRawTransaction`。
 
 ## 示例——部署一个存储合约
 

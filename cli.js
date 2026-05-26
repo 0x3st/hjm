@@ -121,6 +121,7 @@ program
   .option('--p2p-advertise <url>', 'P2P 对外宣告地址，例如 ws://1.2.3.4:6001')
   .option('--seeds <urls>', '种子节点（逗号分隔）', '')
   .option('--data-dir <dir>', '链数据快照目录（启用后重启会加载 chain.json）')
+  .option('--public-rpc', '启用公网 RPC 模式，只允许查询和已签名交易提交')
   .option('--no-p2p', '禁用 P2P')
   .option('--reject-private-ip', '拒绝私有 IP 地址的节点连接')
   .action((opts) => {
@@ -137,6 +138,7 @@ program
       p2pAdvertise: opts.p2pAdvertise || null,
       seeds,
       dataDir: opts.dataDir || null,
+      publicRpc: opts.publicRpc || false,
       rejectPrivateIp: opts.rejectPrivateIp || false,
     });
     server.listen(port, rpcHost, () => {
@@ -145,6 +147,9 @@ program
         console.log(`   ⚠️  警告: RPC 绑定到 0.0.0.0，所有网络接口可访问，存在安全风险！`);
       }
       console.log(`   RPC: http://${rpcHost}:${port}`);
+      if (opts.publicRpc) {
+        console.log(`   RPC 模式: public（只允许查询和 hjm_sendRawTransaction）`);
+      }
       console.log(`   链ID: ${opts.chainId}  哈气值: ${opts.haqi}  奖励: ${opts.reward}`);
       if (opts.dataDir) {
         console.log(`   数据目录: ${opts.dataDir}`);
