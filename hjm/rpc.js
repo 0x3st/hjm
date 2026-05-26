@@ -6,6 +6,8 @@
  */
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { Blockchain } = require('./blockchain');
 const { Wallet } = require('./wallet');
 const { getHaQiMetrics } = require('./block');
@@ -27,14 +29,21 @@ function createNode(options = {}) {
   };
 
   const chain = new Blockchain(chainOpts);
+  const persistence = createPersistence(options.dataDir, chain);
+  persistence.load();
+  chain.on('newBlock', () => persistence.save());
+  chain.on('blockAccepted', () => persistence.save());
+  chain.on('chainReplaced', () => persistence.save());
   // 节点内置钱包缓存：address → Wallet
   const wallets = new Map();
 
   // ── P2P ──
   const p2pEnabled = options.p2p !== false;
   const p2p = p2pEnabled ? new P2PServer(chain, {
+    p2pHost: options.p2pHost || '0.0.0.0',
     p2pPort: options.p2pPort || 6001,
     seeds: options.seeds || [],
+    advertisedAddress: options.p2pAdvertise || null,
     rejectPrivateIp: options.rejectPrivateIp || false,
   }) : null;
 
@@ -68,7 +77,12 @@ function createNode(options = {}) {
     // 查 nonce
     hjm_getNonce([address]) {
       requireParam(address, 'address');
-      return { address, nonce: chain.getNonce(address), sigIndex: chain.getSigIndex(address) };
+      return {
+        address,
+        chainId: chain.chainId,
+        nonce: chain.getNonce(address),
+        sigIndex: chain.getSigIndex(address),
+      };
     },
 
     // 挖矿
@@ -108,6 +122,22 @@ function createNode(options = {}) {
       return { txHash: tx.txHash, sender: w.address, recipient: to, amount: Number(amount) };
     },
 
+    // 提交客户端已签名交易（公网 RPC 推荐使用）
+    hjm_sendRawTransaction([rawTx]) {
+      requireParam(rawTx, 'rawTransaction');
+      const txData = typeof rawTx === 'string' ? JSON.parse(rawTx) : rawTx;
+      const tx = require('./transaction').Transaction.fromData(txData);
+      const ok = chain.addTransaction(tx);
+      if (!ok) throw new Error('已签名交易被拒绝（余额不足/签名无效/nonce 错误）');
+      return {
+        txHash: tx.txHash,
+        sender: tx.sender,
+        recipient: tx.recipient,
+        amount: tx.amount,
+        txType: tx.txType,
+      };
+    },
+
     // 链信息
     hjm_info() {
       const latest = chain.getLatestBlock();
@@ -124,6 +154,15 @@ function createNode(options = {}) {
         pendingTxCount: chain.pendingTransactions.length,
         miningReward: chain.miningReward,
         valid: chain.isChainValid(),
+        publicMethods: [
+          'hjm_info',
+          'hjm_getBalance',
+          'hjm_getNonce',
+          'hjm_getStorage',
+          'hjm_getReceipts',
+          'hjm_sendRawTransaction',
+          'hjm_peers',
+        ],
         p2p: p2p ? p2p.getPeersInfo() : null,
       };
     },
@@ -269,6 +308,45 @@ function createNode(options = {}) {
   }
 
   return { server, chain, wallets, port, methods, p2p };
+}
+
+function createPersistence(dataDir, chain) {
+  if (!dataDir) {
+    return { load() {}, save() {} };
+  }
+
+  const chainFile = path.join(dataDir, 'chain.json');
+
+  return {
+    load() {
+      if (!fs.existsSync(chainFile)) return;
+      try {
+        const snapshot = JSON.parse(fs.readFileSync(chainFile, 'utf8'));
+        const chainData = Array.isArray(snapshot) ? snapshot : snapshot.chain;
+        if (Array.isArray(chainData) && chainData.length > 1) {
+          chain.loadChain(chainData);
+        }
+      } catch (err) {
+        console.error(`[Persistence] 读取链快照失败: ${err.message}`);
+      }
+    },
+
+    save() {
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+        const payload = {
+          version: VERSION,
+          savedAt: new Date().toISOString(),
+          chain: chain.chain.map((block) => block.toDict()),
+        };
+        const tmpFile = `${chainFile}.tmp`;
+        fs.writeFileSync(tmpFile, JSON.stringify(payload, null, 2));
+        fs.renameSync(tmpFile, chainFile);
+      } catch (err) {
+        console.error(`[Persistence] 保存链快照失败: ${err.message}`);
+      }
+    },
+  };
 }
 
 module.exports = { createNode };

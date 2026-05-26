@@ -23,6 +23,7 @@ export default defineConfig({
               items: [
                 { text: '快速开始', link: '/guide/getting-started' },
                 { text: '完整走一遍', link: '/guide/walkthrough' },
+                { text: '部署节点', link: '/guide/deployment' },
                 { text: 'CLI 命令行', link: '/guide/cli' },
                 { text: 'JSON-RPC API', link: '/guide/rpc-api' },
                 { text: '核心概念', link: '/guide/concepts' },
@@ -69,6 +70,7 @@ export default defineConfig({
               items: [
                 { text: 'Getting Started', link: '/en/guide/getting-started' },
                 { text: 'Full Walkthrough', link: '/en/guide/walkthrough' },
+                { text: 'Deploy Nodes', link: '/en/guide/deployment' },
                 { text: 'CLI', link: '/en/guide/cli' },
                 { text: 'JSON-RPC API', link: '/en/guide/rpc-api' },
                 { text: 'Core Concepts', link: '/en/guide/concepts' },

@@ -13,6 +13,7 @@ const {
   Wallet,
   encodeHex,
   decodeToHex,
+  encodeProgram,
   createNode,
   VERSION,
 } = require('./hjm');
@@ -115,8 +116,11 @@ program
   .option('--haqi <value>', '哈气值', '1')
   .option('--reward <amount>', '挖矿奖励', '1000')
   .option('--chain-id <id>', '链 ID', '1')
+  .option('--p2p-host <host>', 'P2P 监听地址', '0.0.0.0')
   .option('--p2p-port <port>', 'P2P 端口', '6001')
+  .option('--p2p-advertise <url>', 'P2P 对外宣告地址，例如 ws://1.2.3.4:6001')
   .option('--seeds <urls>', '种子节点（逗号分隔）', '')
+  .option('--data-dir <dir>', '链数据快照目录（启用后重启会加载 chain.json）')
   .option('--no-p2p', '禁用 P2P')
   .option('--reject-private-ip', '拒绝私有 IP 地址的节点连接')
   .action((opts) => {
@@ -128,8 +132,11 @@ program
       miningReward: Number(opts.reward),
       chainId: Number(opts.chainId),
       p2p: opts.p2p,
+      p2pHost: opts.p2pHost,
       p2pPort: Number(opts.p2pPort),
+      p2pAdvertise: opts.p2pAdvertise || null,
       seeds,
+      dataDir: opts.dataDir || null,
       rejectPrivateIp: opts.rejectPrivateIp || false,
     });
     server.listen(port, rpcHost, () => {
@@ -139,10 +146,15 @@ program
       }
       console.log(`   RPC: http://${rpcHost}:${port}`);
       console.log(`   链ID: ${opts.chainId}  哈气值: ${opts.haqi}  奖励: ${opts.reward}`);
+      if (opts.dataDir) {
+        console.log(`   数据目录: ${opts.dataDir}`);
+      }
       if (p2p) {
-        p2p.myAddress = `ws://0.0.0.0:${opts.p2pPort}`;
+        if (!p2p.myAddress && rpcHost !== '127.0.0.1' && rpcHost !== 'localhost') {
+          p2p.myAddress = `ws://${rpcHost}:${opts.p2pPort}`;
+        }
         p2p.start(() => {
-          console.log(`   P2P: ws://0.0.0.0:${opts.p2pPort}`);
+          console.log(`   P2P: ${p2p.myAddress || `ws://${opts.p2pHost}:${opts.p2pPort}`}`);
           if (seeds.length) console.log(`   种子节点: ${seeds.join(', ')}`);
         });
       } else {
@@ -165,6 +177,33 @@ function withRpc(fn) {
       process.exit(1);
     }
   };
+}
+
+function parseCodeJson(codeJson) {
+  try {
+    return JSON.parse(codeJson);
+  } catch {
+    throw new Error('code_json 格式错误，需要 JSON 数组');
+  }
+}
+
+async function createLocalWalletTx(privateKey, buildTx, rpcUrl) {
+  const wallet = Wallet.fromPrivateKey(privateKey);
+  const nonceInfo = await rpcCall('hjm_getNonce', [wallet.address], rpcUrl);
+  return buildTx(wallet, {
+    nonce: nonceInfo.nonce,
+    sigIndex: nonceInfo.sigIndex,
+    chainId: nonceInfo.chainId || 1,
+  });
+}
+
+async function submitRawTransaction(tx, rpcUrl) {
+  const r = await rpcCall('hjm_sendRawTransaction', [tx.toDict()], rpcUrl);
+  console.log(`✓ 已签名交易已提交`);
+  console.log(`  类型: ${r.txType}`);
+  console.log(`  发送方: ${r.sender.slice(0, 20)}...`);
+  console.log(`  哈希: ${r.txHash.slice(0, 30)}...`);
+  console.log('  提示: 运行 hjm mine <地址> 打包确认');
 }
 
 program
@@ -222,6 +261,41 @@ program
   }));
 
 program
+  .command('transfer-local <private_key> <to> <amount>')
+  .description('本地签名转账，只向 RPC 提交已签名交易')
+  .option('--fee <fee>', '手续费', '500')
+  .option('--gas-limit <limit>', '燃料上限', '1000')
+  .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
+  .action(withRpc(async (privateKey, to, amount, opts, rpcUrl) => {
+    const tx = await createLocalWalletTx(privateKey, (wallet, state) => wallet.createTransaction(to, Number(amount), {
+      chainId: state.chainId,
+      nonce: state.nonce,
+      sigIndex: state.sigIndex,
+      fee: Number(opts.fee),
+      gasLimit: Number(opts.gasLimit),
+      data: encodeProgram([{ op: 'LOG', message: 'transfer' }, { op: 'STOP' }]),
+    }), rpcUrl);
+    await submitRawTransaction(tx, rpcUrl);
+  }));
+
+program
+  .command('send-raw <tx_json>')
+  .description('提交已签名交易 JSON')
+  .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
+  .action(withRpc(async (txJson, _opts, rpcUrl) => {
+    let tx;
+    try {
+      tx = JSON.parse(txJson);
+    } catch {
+      throw new Error('tx_json 格式错误，需要 JSON 对象');
+    }
+    const r = await rpcCall('hjm_sendRawTransaction', [tx], rpcUrl);
+    console.log(`✓ 已签名交易已提交`);
+    console.log(`  类型: ${r.txType}`);
+    console.log(`  哈希: ${r.txHash.slice(0, 30)}...`);
+  }));
+
+program
   .command('deploy <private_key> <code_json>')
   .description('部署合约（code_json 为指令数组 JSON）')
   .option('--fee <fee>', '手续费', '2000')
@@ -229,8 +303,7 @@ program
   .option('--amount <amount>', '附带金额', '0')
   .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
   .action(withRpc(async (privateKey, codeJson, opts, rpcUrl) => {
-    let codeOps;
-    try { codeOps = JSON.parse(codeJson); } catch { throw new Error('code_json 格式错误，需要 JSON 数组'); }
+    const codeOps = parseCodeJson(codeJson);
     const r = await rpcCall('hjm_deploy', [privateKey, codeOps, {
       fee: Number(opts.fee), gasLimit: Number(opts.gasLimit), amount: Number(opts.amount),
     }], rpcUrl);
@@ -238,6 +311,27 @@ program
     console.log(`  发送方: ${r.sender.slice(0, 20)}...`);
     console.log(`  哈希: ${r.txHash.slice(0, 30)}...`);
     console.log('  提示: 挖矿后查看收据获取合约地址');
+  }));
+
+program
+  .command('deploy-local <private_key> <code_json>')
+  .description('本地签名部署合约，只向 RPC 提交已签名交易')
+  .option('--fee <fee>', '手续费', '2000')
+  .option('--gas-limit <limit>', '燃料上限', '5000')
+  .option('--amount <amount>', '附带金额', '0')
+  .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
+  .action(withRpc(async (privateKey, codeJson, opts, rpcUrl) => {
+    const codeOps = parseCodeJson(codeJson);
+    const code = encodeProgram(codeOps);
+    const tx = await createLocalWalletTx(privateKey, (wallet, state) => wallet.createContract(code, {
+      chainId: state.chainId,
+      nonce: state.nonce,
+      sigIndex: state.sigIndex,
+      fee: Number(opts.fee),
+      gasLimit: Number(opts.gasLimit),
+      amount: Number(opts.amount),
+    }), rpcUrl);
+    await submitRawTransaction(tx, rpcUrl);
   }));
 
 program
@@ -255,6 +349,29 @@ program
     console.log(`  合约: ${r.contractAddress.slice(0, 20)}...`);
     console.log(`  哈希: ${r.txHash.slice(0, 30)}...`);
     console.log('  提示: 挖矿后查看收据获取执行结果');
+  }));
+
+program
+  .command('call-local <private_key> <contract_address> [amount]')
+  .description('本地签名调用合约，只向 RPC 提交已签名交易')
+  .option('--data <data>', '调用数据', '')
+  .option('--fee <fee>', '手续费', '1200')
+  .option('--gas-limit <limit>', '燃料上限', '4000')
+  .option('--rpc <url>', 'RPC 地址', DEFAULT_RPC)
+  .action(withRpc(async (privateKey, contractAddress, amount, opts, rpcUrl) => {
+    const tx = await createLocalWalletTx(privateKey, (wallet, state) => wallet.callContract(
+      contractAddress,
+      Number(amount) || 0,
+      {
+        chainId: state.chainId,
+        nonce: state.nonce,
+        sigIndex: state.sigIndex,
+        fee: Number(opts.fee),
+        gasLimit: Number(opts.gasLimit),
+        data: opts.data,
+      },
+    ), rpcUrl);
+    await submitRawTransaction(tx, rpcUrl);
   }));
 
 program

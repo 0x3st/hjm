@@ -33,12 +33,13 @@ const VERSION = '0.3.0';
 class P2PServer {
   constructor(chain, options = {}) {
     this.chain = chain;
+    this.p2pHost = options.p2pHost || '0.0.0.0';
     this.p2pPort = options.p2pPort || 6001;
     this.seeds = options.seeds || [];
     this.rejectPrivateIp = options.rejectPrivateIp || false;
+    this.myAddress = options.advertisedAddress || null; // 对外宣告地址 ws://host:port
     this.sockets = new Set();       // 所有已连接的 WebSocket
     this.knownPeers = new Set();    // 已知节点地址 ws://host:port
-    this.myAddress = null;          // 自身地址，握手后由外部或启动时设置
     this.wss = null;
     this._seenBlocks = new Set();   // 已见区块哈希，防重复广播
     this._seenTxs = new Set();      // 已见交易哈希，防重复广播
@@ -119,10 +120,46 @@ class P2PServer {
       return false;
     }
   }
-  start(callback) {
-    this.wss = new WebSocket.Server({ port: this.p2pPort }, () => {
-      this.log(`P2P 服务启动，端口: ${this.p2pPort}`);
-      if (callback) callback();
+
+  _networkParams() {
+    return {
+      chainId: this.chain.chainId,
+      haQiValue: this.chain.haQiValue,
+      miningReward: this.chain.miningReward,
+      acceptedSignatureSchemes: this.chain.getAcceptedSignatureSchemes
+        ? this.chain.getAcceptedSignatureSchemes()
+        : [],
+    };
+  }
+
+  _hasSameNetworkParams(data = {}) {
+    const local = this._networkParams();
+    const remoteSchemes = Array.isArray(data.acceptedSignatureSchemes)
+      ? data.acceptedSignatureSchemes
+      : local.acceptedSignatureSchemes;
+
+    return data.chainId === local.chainId
+      && (data.haQiValue === undefined || data.haQiValue === local.haQiValue)
+      && (data.miningReward === undefined || data.miningReward === local.miningReward)
+      && JSON.stringify([...remoteSchemes].sort()) === JSON.stringify([...local.acceptedSignatureSchemes].sort());
+  }
+
+  start(callback, errorCallback) {
+    try {
+      this.wss = new WebSocket.Server({ host: this.p2pHost, port: this.p2pPort }, () => {
+        this.log(`P2P 服务启动，地址: ${this.p2pHost}:${this.p2pPort}`);
+        if (callback) callback();
+      });
+    } catch (err) {
+      if (errorCallback) {
+        errorCallback(err);
+        return;
+      }
+      throw err;
+    }
+
+    this.wss.on('error', (err) => {
+      if (errorCallback) errorCallback(err);
     });
 
     this.wss.on('connection', (ws, req) => {
@@ -215,7 +252,7 @@ class P2PServer {
     this._send(ws, {
       type: MSG.HANDSHAKE,
       data: {
-        chainId: this.chain.chainId,
+        ...this._networkParams(),
         version: VERSION,
         blockHeight: this.chain.chain.length,
         p2pPort: this.p2pPort,
@@ -259,14 +296,18 @@ class P2PServer {
   }
 
   _onHandshake(ws, data) {
-    if (data.chainId !== this.chain.chainId) {
-      this.log(`节点链标识不匹配，断开连接`);
+    if (!this._hasSameNetworkParams(data)) {
+      this.log(`节点网络参数不匹配，断开连接`);
       ws.close();
       return;
     }
     if (data.address) {
-      ws._peerAddress = data.address;
-      this.knownPeers.add(data.address);
+      if (!this._isValidPeerAddress(data.address)) {
+        this.log(`节点宣告地址无效，已忽略: ${data.address}`);
+      } else if (data.address !== this.myAddress) {
+        ws._peerAddress = data.address;
+        this.knownPeers.add(data.address);
+      }
     }
     // 如果对方链更长，请求同步
     if (data.blockHeight > this.chain.chain.length) {

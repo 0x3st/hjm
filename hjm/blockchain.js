@@ -516,6 +516,7 @@ class Blockchain {
       const packedHashes = new Set(block.transactions.map(tx => tx.txHash));
       this.pendingTransactions = this.pendingTransactions.filter(tx => !packedHashes.has(tx.txHash));
 
+      this.emit('blockAccepted', block);
       return true;
     } catch (err) {
       this.log(`接收区块异常: ${err.message}`);
@@ -597,6 +598,48 @@ class Blockchain {
     }
 
     this.log(`链已切换，新高度: ${this.chain.length}`);
+    this.emit('chainReplaced', this.chain);
+    return true;
+  }
+
+  loadChain(chainData) {
+    if (!Array.isArray(chainData) || chainData.length === 0) {
+      this.log('链快照为空，拒绝加载');
+      return false;
+    }
+
+    const oldChain = this.chain;
+    const oldState = this.state;
+    const oldBalances = this.balances;
+    const oldNonces = this.nonces;
+    const oldSigIndices = this.sigIndices;
+    const oldReceipts = this.receiptsByBlock;
+    const oldPending = [...this.pendingTransactions];
+    this.pendingTransactions = [];
+    this.chain = [this.chain[0]];
+    const ok = chainData.length === 1
+      ? this._loadGenesisOnly(chainData[0])
+      : this.replaceChain(chainData);
+
+    if (!ok) {
+      this.chain = oldChain;
+      this.state = oldState;
+      this.balances = oldBalances;
+      this.nonces = oldNonces;
+      this.sigIndices = oldSigIndices;
+      this.receiptsByBlock = oldReceipts;
+      this.pendingTransactions = oldPending;
+      this.log(`链快照加载失败，保留当前高度: ${oldChain.length}`);
+      return false;
+    }
+    this.pendingTransactions = oldPending.filter((tx) => this.addTransaction(tx, { silent: true }));
+    this.log(`链快照已加载，高度: ${this.chain.length}`);
+    return true;
+  }
+
+  _loadGenesisOnly(genesisData) {
+    const genesis = new Block(genesisData);
+    if (genesis.hash !== this.chain[0].hash) return false;
     return true;
   }
 

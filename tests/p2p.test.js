@@ -17,6 +17,10 @@ function wait(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+function startP2P(p2p) {
+  return new Promise((resolve, reject) => p2p.start(resolve, reject));
+}
+
 describe('P2P', () => {
   let p2pA, p2pB, chainA, chainB;
 
@@ -29,22 +33,54 @@ describe('P2P', () => {
     chainA = createTestChain();
     chainB = createTestChain();
 
-    p2pA = new P2PServer(chainA, { p2pPort: 9001 });
-    p2pB = new P2PServer(chainB, { p2pPort: 9002, seeds: ['ws://127.0.0.1:9001'] });
+    p2pA = new P2PServer(chainA, { p2pHost: '127.0.0.1', p2pPort: 9001 });
+    p2pB = new P2PServer(chainB, {
+      p2pHost: '127.0.0.1',
+      p2pPort: 9002,
+      seeds: ['ws://127.0.0.1:9001'],
+    });
 
-    await new Promise(r => p2pA.start(r));
-    await new Promise(r => p2pB.start(r));
+    await startP2P(p2pA);
+    await startP2P(p2pB);
     await wait(500);
 
     expect(p2pA.sockets.size).toBeGreaterThanOrEqual(1);
     expect(p2pB.sockets.size).toBeGreaterThanOrEqual(1);
   }, TIMEOUT);
 
+  test('stores advertised address for handshake payloads', () => {
+    chainA = createTestChain();
+    p2pA = new P2PServer(chainA, {
+      p2pPort: 9011,
+      advertisedAddress: 'ws://node-a.example:6001',
+    });
+
+    expect(p2pA.myAddress).toBe('ws://node-a.example:6001');
+  });
+
+  test('detects mismatched network params', () => {
+    chainA = createTestChain();
+    p2pA = new P2PServer(chainA, { p2pPort: 9013 });
+
+    expect(p2pA._hasSameNetworkParams({
+      chainId: 1,
+      haQiValue: 1,
+      miningReward: 1000,
+      acceptedSignatureSchemes: ['hajimi-wots'],
+    })).toBe(true);
+    expect(p2pA._hasSameNetworkParams({
+      chainId: 1,
+      haQiValue: 1,
+      miningReward: 2000,
+      acceptedSignatureSchemes: ['hajimi-wots'],
+    })).toBe(false);
+  });
+
   test('new node syncs longer chain on join', async () => {
     chainA = createTestChain();
 
-    p2pA = new P2PServer(chainA, { p2pPort: 9003 });
-    await new Promise(r => p2pA.start(r));
+    p2pA = new P2PServer(chainA, { p2pHost: '127.0.0.1', p2pPort: 9003 });
+    await startP2P(p2pA);
 
     // A 先挖 2 个块
     const wallet = new Wallet({ chainId: 1 });
@@ -54,8 +90,12 @@ describe('P2P', () => {
 
     // B 加入（只有创世块），A 更长，B 应该同步
     chainB = createTestChain();
-    p2pB = new P2PServer(chainB, { p2pPort: 9004, seeds: ['ws://127.0.0.1:9003'] });
-    await new Promise(r => p2pB.start(r));
+    p2pB = new P2PServer(chainB, {
+      p2pHost: '127.0.0.1',
+      p2pPort: 9004,
+      seeds: ['ws://127.0.0.1:9003'],
+    });
+    await startP2P(p2pB);
 
     await wait(1500);
 
@@ -70,13 +110,17 @@ describe('P2P', () => {
     const wallet = new Wallet({ chainId: 1 });
     chainA.minePendingTransactions(wallet.address);
 
-    p2pA = new P2PServer(chainA, { p2pPort: 9005 });
-    await new Promise(r => p2pA.start(r));
+    p2pA = new P2PServer(chainA, { p2pHost: '127.0.0.1', p2pPort: 9005 });
+    await startP2P(p2pA);
 
     // B 连接 A，先同步
     chainB = createTestChain();
-    p2pB = new P2PServer(chainB, { p2pPort: 9006, seeds: ['ws://127.0.0.1:9005'] });
-    await new Promise(r => p2pB.start(r));
+    p2pB = new P2PServer(chainB, {
+      p2pHost: '127.0.0.1',
+      p2pPort: 9006,
+      seeds: ['ws://127.0.0.1:9005'],
+    });
+    await startP2P(p2pB);
     await wait(1500);
 
     expect(chainB.chain.length).toBe(2);
@@ -106,11 +150,15 @@ describe('P2P', () => {
     expect(chainB.chain.length).toBe(2);
 
     // 连接后 B 应该切换到 A 的更长链
-    p2pA = new P2PServer(chainA, { p2pPort: 9007 });
-    p2pB = new P2PServer(chainB, { p2pPort: 9008, seeds: ['ws://127.0.0.1:9007'] });
+    p2pA = new P2PServer(chainA, { p2pHost: '127.0.0.1', p2pPort: 9007 });
+    p2pB = new P2PServer(chainB, {
+      p2pHost: '127.0.0.1',
+      p2pPort: 9008,
+      seeds: ['ws://127.0.0.1:9007'],
+    });
 
-    await new Promise(r => p2pA.start(r));
-    await new Promise(r => p2pB.start(r));
+    await startP2P(p2pA);
+    await startP2P(p2pB);
 
     await wait(1500);
 

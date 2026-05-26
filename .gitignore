@@ -1,9 +1,11 @@
 # Dependencies
 node_modules/
+.venv/
 
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -18,6 +20,8 @@ coverage/
 # Project specific
 *.log
 blockchain_data/
+.hjm-node/
+hjm-node-data/
 .ace-tool/
 
 # VitePress

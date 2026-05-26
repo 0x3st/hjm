@@ -1,0 +1,79 @@
+services:
+  hjm-node-a:
+    build: .
+    command:
+      - node
+      - cli.js
+      - node
+      - --rpc-host
+      - 0.0.0.0
+      - --port
+      - "8546"
+      - --p2p-port
+      - "6001"
+      - --p2p-advertise
+      - ws://hjm-node-a:6001
+      - --data-dir
+      - /data
+    ports:
+      - "8546:8546"
+      - "6001:6001"
+    volumes:
+      - hjm-node-a-data:/data
+
+  hjm-node-b:
+    build: .
+    command:
+      - node
+      - cli.js
+      - node
+      - --rpc-host
+      - 0.0.0.0
+      - --port
+      - "8546"
+      - --p2p-port
+      - "6001"
+      - --p2p-advertise
+      - ws://hjm-node-b:6001
+      - --seeds
+      - ws://hjm-node-a:6001
+      - --data-dir
+      - /data
+    ports:
+      - "8547:8546"
+      - "6002:6001"
+    volumes:
+      - hjm-node-b-data:/data
+    depends_on:
+      - hjm-node-a
+
+  hjm-node-c:
+    build: .
+    command:
+      - node
+      - cli.js
+      - node
+      - --rpc-host
+      - 0.0.0.0
+      - --port
+      - "8546"
+      - --p2p-port
+      - "6001"
+      - --p2p-advertise
+      - ws://hjm-node-c:6001
+      - --seeds
+      - ws://hjm-node-a:6001
+      - --data-dir
+      - /data
+    ports:
+      - "8548:8546"
+      - "6003:6001"
+    volumes:
+      - hjm-node-c-data:/data
+    depends_on:
+      - hjm-node-a
+
+volumes:
+  hjm-node-a-data:
+  hjm-node-b-data:
+  hjm-node-c-data:
